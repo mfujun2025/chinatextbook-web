@@ -1,0 +1,7 @@
+[
+  { "id": "single", "name": "单本购买", "price": 0.99, "description": "购买单本教材PDF下载权限", "books": 1 },
+  { "id": "bundle_primary", "name": "小学全套", "price": 9.9, "description": "小学全部教材（约176本）", "books": 176, "stage": "小学" },
+  { "id": "bundle_junior", "name": "初中全套", "price": 19.9, "description": "初中全部教材（约184本）", "books": 184, "stage": "初中" },
+  { "id": "bundle_senior", "name": "高中全套", "price": 19.9, "description": "高中全部教材（约137本）", "books": 137, "stage": "高中" },
+  { "id": "bundle_all", "name": "全学段全套", "price": 39.9, "description": "小学+初中+高中+大学全部教材（637本）", "books": 637 }
+]

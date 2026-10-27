@@ -204,6 +204,7 @@ function downloadUrl(book){
   }
   return rawUrl(book.path);
 }
+let pricingData = [];
 
 // ---------- load catalog ----------
 async function loadCatalog(){
@@ -217,6 +218,11 @@ async function loadCatalog(){
     document.getElementById('statBooks').textContent = allBooks.length;
     document.getElementById('statStages').textContent = new Set(allBooks.map(b=>b.stage)).size;
     document.getElementById('statSubjects').textContent = new Set(allBooks.map(b=>b.subject)).size;
+    // 加载定价
+    try{
+      const pRes = await fetch('data/pricing.json');
+      pricingData = await pRes.json();
+    }catch(e){ console.warn('pricing.json load failed:', e); }
     buildFilters();
     applyFilter();
   }catch(e){
@@ -317,7 +323,7 @@ function renderCard(b){
     ${b.size ? '<div class="size">大小：' + fmtSize(b.size) + '</div>' : ''}
     ${b.sharded ? '<div class="size" style="color:#f53f3f">⚠ 需合并分片</div>' : ''}
     <div class="actions">
-      <button class="btn btn-primary" data-action="download">下载 PDF</button>
+      <button class="btn btn-primary" data-action="buy">购买下载</button>
       <a class="btn btn-outline" href="${b._url}" target="_blank" data-action="preview">预览</a>
     </div>
   `;
@@ -325,8 +331,8 @@ function renderCard(b){
   card.querySelectorAll('[data-action]').forEach(a => {
     a.onclick = (e) => { e.stopPropagation(); };
   });
-  card.querySelector('[data-action="download"]').onclick = (e) => {
-    e.stopPropagation(); showModal(b);
+  card.querySelector('[data-action="buy"]').onclick = (e) => {
+    e.stopPropagation(); goToPay(b);
   };
   return card;
 }
@@ -349,6 +355,17 @@ function renderPagination(){
   next.disabled = currentPage===total;
   next.onclick = () => { currentPage++; renderGrid(); renderPagination(); };
   pg.appendChild(next);
+}
+
+// ---------- 购买跳转 ----------
+function goToPay(book){
+  const url = 'pay.html?book=' + encodeURIComponent(book.path)
+    + '&name=' + encodeURIComponent(book.name)
+    + '&stage=' + encodeURIComponent(book.stage)
+    + '&subject=' + encodeURIComponent(book.subject)
+    + '&version=' + encodeURIComponent(book.version)
+    + '&grade=' + encodeURIComponent(book.grade);
+  window.location.href = url;
 }
 
 // ---------- modal ----------
@@ -378,13 +395,13 @@ function showModal(book){
   }
 
   html += `
-    <div class="download-area free">
-      <div class="icon">⬇️</div>
-      <div class="title">免费下载</div>
-      <div class="desc">点击下方按钮直接下载 PDF 文件</div>
+    <div class="download-area">
+      <div class="icon">🛒</div>
+      <div class="title">付费下载</div>
+      <div class="desc">此教材需付费购买后下载</div>
       <div style="margin-top:16px">
-        <a class="btn btn-primary" href="${book._url}" target="_blank" style="font-size:15px;padding:10px 24px">
-          ⬇ 下载 ${book.name}
+        <a class="btn btn-primary" href="pay.html?book=${encodeURIComponent(book.path)}&name=${encodeURIComponent(book.name)}&stage=${encodeURIComponent(book.stage)}&subject=${encodeURIComponent(book.subject)}&version=${encodeURIComponent(book.version)}&grade=${encodeURIComponent(book.grade)}" style="font-size:15px;padding:10px 24px">
+          💰 前往购买
         </a>
       </div>
     </div>

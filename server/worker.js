@@ -1,26 +1,13 @@
 /**
- * Cloudflare Worker - Vibe Pay 支付服务器
+ * Cloudflare Worker - 支付宝 Vibe Pay 支付服务器
  *
  * 功能：
- *  - POST /api/createOrder  创建支付订单
- *  - POST /api/callback      接收支付回调
- *  - GET  /api/order/:id     查询订单状态
- *  - GET  /api/download      验证后返回下载链接
+ *  - POST /api/createOrder  创建支付订单，返回支付宝支付跳转URL
+ *  - POST /api/notify       接收支付宝异步通知，验签并更新订单状态
+ *  - GET  /api/query        查询订单状态
+ *  - GET  /api/download     验证支付后返回教材下载链接
  *
- * 部署：
- *  1. 在 Cloudflare 注册并获取 API Token
- *  2. 创建 Worker，粘贴本文件
- *  3. 在 Worker 设置中绑定 KV 或 DO（用于存储订单状态）
- *  4. 配置环境变量：
- *     VIBE_APP_ID       - Vibe Pay 应用 ID
- *     VIBE_APP_SECRET   - Vibe Pay 应用密钥
- *     VIBE_BASE_URL     - Vibe Pay API 地址（默认 https://api.vibepay.cn）
- *
- * 使用：
- *  前端调用 POST /api/createOrder 创建订单，返回支付链接
- *  Vibe Pay 支付完成后回调 POST /api/callback
- *  前端轮询 GET /api/order/:id 确认支付状态
- *  支付成功后调用 GET /api/download?book=xxx 获取下载链接
+ * 部署到 Cloudflare Workers，使用 KV 存储订单数据。
  */
 
 export default {
@@ -28,157 +15,291 @@ export default {
     const url = new URL(request.url);
     const method = request.method;
 
-    // CORS 头
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    };
-
+    // CORS 处理
     if (method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders });
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      });
     }
 
     // 路由
     if (url.pathname === '/api/createOrder' && method === 'POST') {
-      return createOrder(request, env, corsHeaders);
+      return createOrder(request, env);
     }
-    if (url.pathname === '/api/callback' && method === 'POST') {
-      return handleCallback(request, env, corsHeaders);
+    if (url.pathname === '/api/notify' && method === 'POST') {
+      return handleNotify(request, env);
     }
-    if (url.pathname.startsWith('/api/order/') && method === 'GET') {
-      return queryOrder(url, env, corsHeaders);
+    if (url.pathname === '/api/query' && method === 'GET') {
+      return queryOrder(url, env);
     }
     if (url.pathname === '/api/download' && method === 'GET') {
-      return downloadLink(url, env, corsHeaders);
+      return downloadLink(url, env);
     }
 
-    return jsonResponse({ error: 'Not Found' }, 404, corsHeaders);
+    return jsonError('Not Found', 404);
   },
 };
 
-// ---------- 创建订单 ----------
-async function createOrder(request, env, headers) {
+// ========== 创建订单 ==========
+async function createOrder(request, env) {
   try {
     const body = await request.json();
     const { bookId, bookName, amount } = body;
 
     if (!bookId || !bookName || !amount) {
-      return jsonResponse({ error: '缺少参数' }, 400, headers);
+      return jsonError('缺少参数: bookId, bookName, amount', 400);
     }
 
-    const orderId = 'ORD_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
+    // 生成商户订单号
+    const outTradeNo = 'CTB_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
 
-    // 调用 Vibe Pay API 创建订单
-    // TODO: 替换为实际的 Vibe Pay API 调用
-    const payload = {
-      app_id: env.VIBE_APP_ID,
-      order_id: orderId,
-      product_id: bookId,
-      amount: amount,
-      title: bookName,
-      notify_url: `${new URL(request.url).origin}/api/callback`,
+    // 构造支付宝请求参数
+    const bizContent = {
+      out_trade_no: outTradeNo,
+      total_amount: amount,
+      subject: bookName,
+      product_code: 'FAST_INSTANT_TRADE_PAY',
+      body: `教材下载: ${bookName}`,
     };
 
-    // const resp = await fetch(`${env.VIBE_BASE_URL || 'https://api.vibepay.cn'}/v1/orders`, {
-    //   method: 'POST',
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Authorization': `Bearer ${env.VIBE_APP_SECRET}`,
-    //   },
-    //   body: JSON.stringify(payload),
-    // });
-    // const data = await resp.json();
+    // 构造公共参数
+    const params = {
+      app_id: env.ALIPAY_APP_ID,
+      method: 'alipay.trade.page.pay',
+      format: 'JSON',
+      charset: 'utf-8',
+      sign_type: 'RSA2',
+      timestamp: formatTimestamp(),
+      version: '1.0',
+      biz_content: JSON.stringify(bizContent),
+      notify_url: `${new URL(request.url).origin}/api/notify`,
+    };
 
-    // 暂时返回模拟支付链接（需替换为真实 API）
-    const payUrl = `https://pay.vibepay.cn/pay/${orderId}`;
+    // 签名
+    const signStr = buildSignString(params);
+    const signature = await rsaSign(signStr, env.ALIPAY_PRIVATE_KEY);
+    params.sign = signature;
 
-    return jsonResponse({
-      order_id: orderId,
+    // 构造跳转URL
+    const gateway = env.ALIPAY_GATEWAY || 'https://openapi.alipay.com/gateway.do';
+    const payUrl = `${gateway}?${new URLSearchParams(params).toString()}`;
+
+    // 存储订单到KV
+    const orderData = {
+      outTradeNo,
+      bookId,
+      bookName,
+      amount,
+      status: 'pending',
+      createdAt: Date.now(),
+    };
+
+    await env.ORDERS.put(outTradeNo, JSON.stringify(orderData), { expirationTtl: 86400 });
+
+    return jsonOk({
+      order_id: outTradeNo,
       pay_url: payUrl,
       status: 'pending',
-    }, 200, headers);
+    });
   } catch (e) {
-    return jsonResponse({ error: e.message }, 500, headers);
+    return jsonError('创建订单失败: ' + e.message, 500);
   }
 }
 
-// ---------- 支付回调 ----------
-async function handleCallback(request, env, headers) {
+// ========== 处理支付宝异步通知 ==========
+async function handleNotify(request, env) {
   try {
-    const body = await request.json();
-    const { order_id, status, amount, sign } = body;
-
-    // TODO: 验签
-    // const expectedSign = signData(body, env.VIBE_APP_SECRET);
-    // if (sign !== expectedSign) {
-    //   return jsonResponse({ error: '验签失败' }, 400, headers);
-    // }
-
-    if (status === 'paid' || status === 'success') {
-      // TODO: 更新订单状态到 KV/DO
-      return jsonResponse({ success: true, message: '已确认收款' }, 200, headers);
+    const formData = await request.formData();
+    const params = {};
+    for (const [key, value] of formData.entries()) {
+      params[key] = value;
     }
 
-    return jsonResponse({ success: false, message: '未确认收款' }, 200, headers);
+    // 验签
+    const sign = params.sign;
+    delete params.sign;
+    delete params.sign_type;
+
+    const signStr = buildSignString(params);
+    const valid = await rsaVerify(signStr, sign, env.ALIPAY_PUBLIC_KEY);
+
+    if (!valid) {
+      return new Response('failure', { status: 200 });
+    }
+
+    const { out_trade_no, trade_status, total_amount } = params;
+
+    // 查询订单
+    const orderRaw = await env.ORDERS.get(out_trade_no);
+    if (!orderRaw) {
+      return new Response('failure', { status: 200 });
+    }
+
+    const order = JSON.parse(orderRaw);
+
+    // 核对金额
+    if (order.amount !== parseFloat(total_amount)) {
+      return new Response('failure', { status: 200 });
+    }
+
+    // 更新订单状态
+    if (trade_status === 'TRADE_SUCCESS' || trade_status === 'TRADE_FINISHED') {
+      order.status = 'paid';
+      order.paidAt = Date.now();
+      await env.ORDERS.put(out_trade_no, JSON.stringify(order), { expirationTtl: 86400 });
+      return new Response('success', { status: 200 });
+    }
+
+    return new Response('failure', { status: 200 });
   } catch (e) {
-    return jsonResponse({ error: e.message }, 500, headers);
+    return new Response('failure', { status: 200 });
   }
 }
 
-// ---------- 查询订单 ----------
-async function queryOrder(url, env, headers) {
-  const orderId = url.pathname.split('/').pop();
+// ========== 查询订单状态 ==========
+async function queryOrder(url, env) {
+  const orderId = url.searchParams.get('order_id');
+  if (!orderId) return jsonError('缺少order_id', 400);
 
-  // TODO: 从 KV/DO 查询订单状态
-  // const order = await env.ORDERS.get(orderId);
+  const raw = await env.ORDERS.get(orderId);
+  if (!raw) return jsonError('订单不存在', 404);
 
-  // 暂时返回模拟状态
-  return jsonResponse({
-    order_id: orderId,
-    status: 'pending', // pending / paid / refunded
-  }, 200, headers);
+  const order = JSON.parse(raw);
+  return jsonOk({
+    order_id: order.outTradeNo,
+    status: order.status,
+    book_name: order.bookName,
+    amount: order.amount,
+  });
 }
 
-// ---------- 下载链接 ----------
-async function downloadLink(url, env, headers) {
-  const bookId = url.searchParams.get('book');
-  const orderId = url.searchParams.get('order');
+// ========== 获取下载链接 ==========
+async function downloadLink(url, env) {
+  const orderId = url.searchParams.get('order_id');
+  const bookId = url.searchParams.get('book_id');
 
-  if (!bookId || !orderId) {
-    return jsonResponse({ error: '缺少参数' }, 400, headers);
+  if (!orderId || !bookId) return jsonError('缺少参数', 400);
+
+  const raw = await env.ORDERS.get(orderId);
+  if (!raw) return jsonError('订单不存在', 404);
+
+  const order = JSON.parse(raw);
+  if (order.status !== 'paid') {
+    return jsonError('订单未支付', 403);
   }
 
-  // TODO: 验证订单已支付
-  // const order = await env.ORDERS.get(orderId);
-  // if (!order || order.status !== 'paid') {
-  //   return jsonResponse({ error: '未支付或订单不存在' }, 403, headers);
-  // }
+  if (order.bookId !== bookId) {
+    return jsonError('订单与教材不匹配', 403);
+  }
 
-  // TODO: 返回实际下载链接（从 catalog.json 查询）
-  const downloadUrl = `https://raw.githubusercontent.com/mfujun2025/ChinaTextbook/master/${bookId}`;
+  // 返回教材的 raw 下载链接
+  const baseUrl = env.DOWNLOAD_BASE_URL || 'https://raw.githubusercontent.com/mfujun2025/ChinaTextbook/master/';
+  const downloadUrl = baseUrl + bookId;
 
-  return jsonResponse({
-    download_url: downloadUrl,
-    expires_in: 3600,
-  }, 200, headers);
+  return jsonOk({ download_url: downloadUrl });
 }
 
-// ---------- 工具函数 ----------
-function jsonResponse(data, status = 200, headers = {}) {
+// ========== 工具函数 ==========
+function formatTimestamp() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function buildSignString(params) {
+  return Object.keys(params)
+    .filter((k) => params[k] !== undefined && params[k] !== '' && k !== 'sign')
+    .sort()
+    .map((k) => `${k}=${params[k]}`)
+    .join('&');
+}
+
+async function rsaSign(message, privateKeyPem) {
+  const { sign } = await crypto.subtle.importKey(
+    'pkcs8',
+    pemToArrayBuffer(privateKeyPem),
+    { name: 'RSA-PSS', hash: 'SHA-256' },
+    false,
+    ['sign']
+  ).then(async (key) => {
+    const sig = await crypto.subtle.sign(
+      { name: 'RSA-PSS', saltLength: 32 },
+      key,
+      new TextEncoder().encode(message)
+    );
+    return { sign: base64ToHex(sig) };
+  });
+  return sign;
+}
+
+async function rsaVerify(message, signatureHex, publicKeyPem) {
+  try {
+    const key = await crypto.subtle.importKey(
+      'spki',
+      pemToArrayBuffer(publicKeyPem),
+      { name: 'RSA-PSS', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+    const sigBytes = hexToArrayBuffer(signatureHex);
+    return crypto.subtle.verify(
+      { name: 'RSA-PSS', saltLength: 32 },
+      key,
+      sigBytes,
+      new TextEncoder().encode(message)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function pemToArrayBuffer(pem) {
+  const b64 = pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+  const bin = atob(b64);
+  const buf = new ArrayBuffer(bin.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < bin.length; i++) view[i] = bin.charCodeAt(i);
+  return buf;
+}
+
+function base64ToHex(b64) {
+  const bin = atob(b64);
+  let hex = '';
+  for (let i = 0; i < bin.length; i++) {
+    hex += bin.charCodeAt(i).toString(16).padStart(2, '0').toUpperCase();
+  }
+  return hex;
+}
+
+function hexToArrayBuffer(hex) {
+  const arr = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < arr.length; i++) {
+    arr[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return arr.buffer;
+}
+
+function jsonOk(data) {
   return new Response(JSON.stringify(data), {
-    status,
+    status: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      ...headers,
+      'Access-Control-Allow-Origin': '*',
     },
   });
 }
 
-function signData(data, secret) {
-  // TODO: 实现 Vibe Pay 签名算法
-  const sorted = Object.keys(data).sort();
-  const str = sorted.map(k => k + '=' + data[k]).join('&') + '&key=' + secret;
-  // return crypto-js.MD5(str).toString().toUpperCase();
-  return '';
+function jsonError(msg, status = 400) {
+  return new Response(JSON.stringify({ error: msg }), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': '*',
+    },
+  });
 }

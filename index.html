@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中国教材库 - 小初高大学PDF教材在线下载</title>
+<meta name="description" content="收录小学、初中、高中、大学各版本PDF教材，支持在线浏览、筛选与下载。涵盖人教版、北师大版、苏教版等主流版本。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<style>
+:root{
+  --c-primary:#1677ff;--c-primary-dark:#0958d9;--c-bg:#f5f7fa;--c-card:#fff;
+  --c-text:#1f2329;--c-text-2:#646a73;--c-border:#e5e6eb;--c-green:#00b42a;
+  --c-orange:#ff7d00;--c-red:#f53f3f;
+  --radius:12px;--shadow:0 1px 4px rgba(0,0,0,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--c-bg);color:var(--c-text);line-height:1.6}
+a{color:inherit;text-decoration:none}
+.container{max-width:1200px;margin:0 auto;padding:0 20px}
+
+/* header */
+header{background:var(--c-card);border-bottom:1px solid var(--c-border);position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+header .container{display:flex;align-items:center;height:64px;gap:24px}
+header h1{font-size:20px;font-weight:700;white-space:nowrap}
+header h1 .logo{color:var(--c-primary)}
+header nav{display:flex;gap:20px;font-size:14px}
+header nav a:hover{color:var(--c-primary)}
+header .search{margin-left:auto;position:relative}
+header input{width:280px;padding:8px 12px 8px 36px;border:1px solid var(--c-border);border-radius:20px;font-size:14px;outline:none;transition:.2s;background:#f7f8fa}
+header input:focus{border-color:var(--c-primary);box-shadow:0 0 0 3px rgba(22,119,255,.1);background:#fff}
+header .search::before{content:"🔍";position:absolute;left:12px;top:50%;transform:translateY(-50%)}
+
+/* hero */
+.hero{background:linear-gradient(135deg,#1677ff 0%,#0958d9 100%);color:#fff;padding:48px 0;text-align:center}
+.hero h2{font-size:32px;font-weight:800;margin-bottom:12px}
+.hero p{font-size:16px;opacity:.9;max-width:600px;margin:0 auto 24px}
+.hero .stats{display:flex;justify-content:center;gap:32px;flex-wrap:wrap}
+.hero .stat{text-align:center}
+.hero .stat .num{font-size:28px;font-weight:800}
+.hero .stat .label{font-size:13px;opacity:.85}
+
+/* filter */
+.filter-bar{background:var(--c-card);border-bottom:1px solid var(--c-border);padding:16px 0}
+.filter-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.filter-row .label{font-size:13px;color:var(--c-text-2);min-width:56px;font-weight:600}
+.chip{padding:6px 14px;border:1px solid var(--c-border);border-radius:20px;font-size:13px;cursor:pointer;transition:.15s;background:#fff;color:var(--c-text-2);white-space:nowrap}
+.chip:hover{border-color:var(--c-primary);color:var(--c-primary)}
+.chip.active{background:var(--c-primary);border-color:var(--c-primary);color:#fff}
+
+/* grid */
+.main{padding:24px 0 48px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.card{background:var(--c-card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;transition:.2s;border:1px solid transparent;cursor:pointer}
+.card:hover{transform:translateY(-2px);border-color:var(--c-primary);box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.card .badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.badge{font-size:11px;padding:2px 8px;border-radius:4px;display:inline-block}
+.badge.stage{background:#e8f3ff;color:#1677ff}
+.badge.subject{background:#f6ffed;color:#00b42a}
+.badge.version{background:#fff7e8;color:#ff7d00}
+.badge.sharded{background:#fff1f0;color:#f53f3f}
+.card h3{font-size:15px;font-weight:600;margin-bottom:8px;line-height:1.4}
+.card .meta{font-size:12px;color:var(--c-text-2);margin-bottom:6px}
+.card .size{font-size:12px;color:var(--c-text-2);margin-bottom:12px}
+.card .actions{display:flex;gap:8px}
+.btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:.15s;display:inline-flex;align-items:center;gap:4px}
+.btn-primary{background:var(--c-primary);color:#fff}
+.btn-primary:hover{background:var(--c-primary-dark)}
+.btn-outline{background:#fff;border:1px solid var(--c-border);color:var(--c-text)}
+.btn-outline:hover{border-color:var(--c-primary);color:var(--c-primary)}
+
+/* pagination */
+.pagination{display:flex;justify-content:center;gap:8px;padding:32px 0}
+.pagination button{padding:8px 14px;border:1px solid var(--c-border);background:#fff;border-radius:8px;cursor:pointer;font-size:14px;color:var(--c-text-2)}
+.pagination button.active{background:var(--c-primary);color:#fff;border-color:var(--c-primary)}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
+
+/* footer */
+footer{background:var(--c-card);border-top:1px solid var(--c-border);padding:32px 0;text-align:center;font-size:13px;color:var(--c-text-2)}
+footer a{color:var(--c-primary)}
+
+/* modal */
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000;display:none;align-items:flex-start;justify-content:center;padding:60px 20px;overflow-y:auto}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:16px;max-width:600px;width:100%;padding:32px;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal h2{font-size:22px;font-weight:700;margin-bottom:16px;line-height:1.4}
+.modal .close{float:right;font-size:24px;cursor:pointer;color:var(--c-text-2);border:none;background:none;line-height:1}
+.modal .close:hover{color:var(--c-text)}
+.modal .info{background:#f7f8fa;border-radius:12px;padding:16px;margin-bottom:20px}
+.modal .info-row{display:flex;justify-content:space-between;padding:6px 0;font-size:14px}
+.modal .info-row .k{color:var(--c-text-2)}
+.modal .info-row .v{font-weight:500}
+.modal .download-area{border:2px dashed var(--c-border);border-radius:12px;padding:24px;text-align:center;margin-bottom:16px}
+.modal .download-area.free{border-color:var(--c-green);background:#f6ffed}
+.modal .download-area .icon{font-size:40px;margin-bottom:8px}
+.modal .download-area .title{font-size:16px;font-weight:600;margin-bottom:4px}
+.modal .download-area .desc{font-size:13px;color:var(--c-text-2)}
+.modal .shard-notice{background:#fff7e8;border:1px solid #ffd591;border-radius:8px;padding:12px;font-size:13px;color:#d46b08;margin-bottom:16px}
+
+/* empty */
+.empty{text-align:center;padding:60px 0;color:var(--c-text-2);font-size:15px}
+
+/* loading */
+.loading{text-align:center;padding:40px 0;color:var(--c-text-2)}
+.loading .spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--c-border);border-top-color:var(--c-primary);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* responsive */
+@media(max-width:640px){
+  header .container{flex-wrap:wrap;height:auto;padding:12px 16px}
+  header input{width:100%;margin:8px 0 0}
+  .hero h2{font-size:22px}
+  .hero p{font-size:14px}
+  .grid{grid-template-columns:1fr}
+  .modal{padding:24px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1><span class="logo">📚</span> 中国教材库</h1>
+    <nav>
+      <a href="#home">首页</a>
+      <a href="#about">关于</a>
+      <a href="https://github.com/mfujun2025/ChinaTextbook" target="_blank">GitHub</a>
+    </nav>
+    <div class="search">
+      <input type="text" id="searchInput" placeholder="搜索书名、学科、版本…">
+    </div>
+  </div>
+</header>
+
+<section class="hero" id="home">
+  <div class="container">
+    <h2>小初高大学教材，一站收录</h2>
+    <p>收录人教版、北师大版、苏教版等主流版本教材 PDF，按学段、学科、版本、年级分类浏览，在线预览与下载。</p>
+    <div class="stats">
+      <div class="stat"><div class="num" id="statBooks">—</div><div class="label">本教材</div></div>
+      <div class="stat"><div class="num" id="statStages">—</div><div class="label">个学段</div></div>
+      <div class="stat"><div class="num" id="statSubjects">—</div><div class="label">个学科</div></div>
+    </div>
+  </div>
+</section>
+
+<div class="filter-bar">
+  <div class="container">
+    <div class="filter-row" id="stageFilter"><span class="label">学段</span></div>
+    <div class="filter-row" id="subjectFilter"><span class="label">学科</span></div>
+    <div class="filter-row" id="versionFilter"><span class="label">版本</span></div>
+    <div class="filter-row" id="gradeFilter"><span class="label">年级</span></div>
+  </div>
+</div>
+
+<main class="main">
+  <div class="container">
+    <div id="content"></div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</main>
+
+<footer id="about">
+  <div class="container">
+    <p>教材来源：<a href="https://github.com/mfujun2025/ChinaTextbook" target="_blank">ChinaTextbook 开源项目</a></p>
+    <p style="margin-top:8px">本站仅提供教材索引与下载链接，教材版权归原作者及出版社所有。仅供学习交流使用。</p>
+  </div>
+</footer>
+
+<!-- modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <button class="close" id="modalClose">&times;</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script>
+const PAGE_SIZE = 48;
+let allBooks = [];
+let filtered = [];
+let currentPage = 1;
+let activeFilters = { stage:'', subject:'', version:'', grade:'' };
+
+// ---------- helpers ----------
+function el(tag, cls, html){
+  const e = document.createElement(tag);
+  if(cls) e.className = cls;
+  if(html !== undefined) e.innerHTML = html;
+  return e;
+}
+function fmtSize(b){
+  if(!b) return '';
+  if(b < 1024) return b + 'B';
+  if(b < 1048576) return (b/1024).toFixed(1) + 'KB';
+  if(b < 1073741824) return (b/1048576).toFixed(1) + 'MB';
+  return (b/1073741824).toFixed(2) + 'GB';
+}
+function rawUrl(path){
+  return 'https://raw.githubusercontent.com/mfujun2025/ChinaTextbook/master/' + encodeURI(path).replace(/%2F/g,'/');
+}
+function downloadUrl(book){
+  if(book.sharded && book.shards){
+    return book.shards.map(s => rawUrl(s)).join('\n');
+  }
+  return rawUrl(book.path);
+}
+
+// ---------- load catalog ----------
+async function loadCatalog(){
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="loading"><div class="spinner"></div><p style="margin-top:12px">正在加载教材目录…</p></div>';
+  try{
+    const res = await fetch('data/catalog.json');
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    allBooks = await res.json();
+    allBooks.forEach(b => { b._url = downloadUrl(b); });
+    document.getElementById('statBooks').textContent = allBooks.length;
+    document.getElementById('statStages').textContent = new Set(allBooks.map(b=>b.stage)).size;
+    document.getElementById('statSubjects').textContent = new Set(allBooks.map(b=>b.subject)).size;
+    buildFilters();
+    applyFilter();
+  }catch(e){
+    content.innerHTML = '<div class="empty">加载失败：' + e.message + '<br>请检查 data/catalog.json 是否存在。</div>';
+  }
+}
+
+// ---------- filters ----------
+function buildFilters(){
+  const stages = [...new Set(allBooks.map(b=>b.stage))];
+  const subjects = [...new Set(allBooks.map(b=>b.subject))];
+  const versions = [...new Set(allBooks.map(b=>b.version))];
+  buildChipRow('stageFilter', stages, 'stage');
+  buildChipRow('subjectFilter', subjects, 'subject');
+  buildChipRow('versionFilter', versions, 'version');
+  refreshGradeOptions();
+
+  document.getElementById('stageFilter').addEventListener('click', () => refreshGradeOptions());
+  document.getElementById('subjectFilter').addEventListener('click', () => refreshGradeOptions());
+  document.getElementById('versionFilter').addEventListener('click', () => refreshGradeOptions());
+}
+
+function buildChipRow(id, items, key){
+  const row = document.getElementById(id);
+  const labels = {stage:'学段',subject:'学科',version:'版本',grade:'年级'};
+  row.innerHTML = '<span class="label">' + labels[key] + '</span>';
+  const all = el('button','chip' + (activeFilters[key]===''?' active':''), '全部');
+  all.onclick = () => { activeFilters[key]=''; buildChipRow(id, items, key); applyFilter(); };
+  row.appendChild(all);
+  items.forEach(v => {
+    const c = el('button','chip' + (activeFilters[key]===v?' active':''), v);
+    c.onclick = () => { activeFilters[key] = activeFilters[key]===v ? '' : v; buildChipRow(id, items, key); applyFilter(); };
+    row.appendChild(c);
+  });
+}
+
+function refreshGradeOptions(){
+  const grades = [...new Set(filtered.map(b=>b.grade))];
+  if(grades.length && !grades.includes(activeFilters.grade)) activeFilters.grade = '';
+  buildChipRow('gradeFilter', grades, 'grade');
+}
+
+// ---------- search + filter ----------
+function applyFilter(){
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  filtered = allBooks.filter(b => {
+    if(activeFilters.stage && b.stage !== activeFilters.stage) return false;
+    if(activeFilters.subject && b.subject !== activeFilters.subject) return false;
+    if(activeFilters.version && b.version !== activeFilters.version) return false;
+    if(activeFilters.grade && b.grade !== activeFilters.grade) return false;
+    if(q){
+      const hay = (b.name + b.stage + b.subject + b.version + b.grade).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  if(currentPage > Math.ceil(filtered.length / PAGE_SIZE)) currentPage = 1;
+  renderGrid();
+  renderPagination();
+}
+
+document.getElementById('searchInput').addEventListener('input', () => {
+  currentPage = 1; applyFilter();
+});
+
+// ---------- render ----------
+function renderGrid(){
+  const content = document.getElementById('content');
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end = start + PAGE_SIZE;
+  const pageBooks = filtered.slice(start, end);
+
+  if(pageBooks.length === 0){
+    content.innerHTML = '<div class="empty">没有找到匹配的教材，试试调整筛选条件。</div>';
+    return;
+  }
+
+  content.innerHTML = '';
+  const grid = el('div','grid');
+  pageBooks.forEach(b => {
+    grid.appendChild(renderCard(b));
+  });
+  content.appendChild(grid);
+}
+
+function renderCard(b){
+  const card = el('div','card');
+  card.onclick = () => showModal(b);
+  card.innerHTML = `
+    <div class="badges">
+      <span class="badge stage">${b.stage}</span>
+      <span class="badge subject">${b.subject}</span>
+      <span class="badge version">${b.version}</span>
+      ${b.sharded ? '<span class="badge sharded">分片</span>' : ''}
+    </div>
+    <h3>${b.name}</h3>
+    <div class="meta">年级：${b.grade}</div>
+    ${b.size ? '<div class="size">大小：' + fmtSize(b.size) + '</div>' : ''}
+    ${b.sharded ? '<div class="size" style="color:#f53f3f">⚠ 需合并分片</div>' : ''}
+    <div class="actions">
+      <button class="btn btn-primary" data-action="download">下载 PDF</button>
+      <a class="btn btn-outline" href="${b._url}" target="_blank" data-action="preview">预览</a>
+    </div>
+  `;
+  // stop propagation for buttons
+  card.querySelectorAll('[data-action]').forEach(a => {
+    a.onclick = (e) => { e.stopPropagation(); };
+  });
+  card.querySelector('[data-action="download"]').onclick = (e) => {
+    e.stopPropagation(); showModal(b);
+  };
+  return card;
+}
+
+function renderPagination(){
+  const pg = document.getElementById('pagination');
+  const total = Math.ceil(filtered.length / PAGE_SIZE);
+  if(total <= 1){ pg.innerHTML = ''; return; }
+  pg.innerHTML = '';
+  const prev = el('button', currentPage===1?'':'active', '上一页');
+  prev.disabled = currentPage===1;
+  prev.onclick = () => { currentPage--; renderGrid(); renderPagination(); };
+  pg.appendChild(prev);
+  for(let i=1; i<=total; i++){
+    const b = el('button', i===currentPage?'active':'', i);
+    b.onclick = () => { currentPage=i; renderGrid(); renderPagination(); };
+    pg.appendChild(b);
+  }
+  const next = el('button', currentPage===total?'':'active', '下一页');
+  next.disabled = currentPage===total;
+  next.onclick = () => { currentPage++; renderGrid(); renderPagination(); };
+  pg.appendChild(next);
+}
+
+// ---------- modal ----------
+function showModal(book){
+  const modal = document.getElementById('modal');
+  const content = document.getElementById('modalContent');
+  const sizeStr = book.size ? fmtSize(book.size) : '未知';
+
+  let html = `
+    <h2>${book.name}</h2>
+    <div class="info">
+      <div class="info-row"><span class="k">学段</span><span class="v">${book.stage}</span></div>
+      <div class="info-row"><span class="k">学科</span><span class="v">${book.subject}</span></div>
+      <div class="info-row"><span class="k">版本</span><span class="v">${book.version}</span></div>
+      <div class="info-row"><span class="k">年级</span><span class="v">${book.grade}</span></div>
+      <div class="info-row"><span class="k">大小</span><span class="v">${sizeStr}</span></div>
+      ${book.sharded ? '<div class="info-row"><span class="k">状态</span><span class="v" style="color:#f53f3f">分片文件（' + book.shards.length + ' 个分片）</span></div>' : ''}
+    </div>
+  `;
+
+  if(book.sharded){
+    html += `
+      <div class="shard-notice">
+        ⚠️ 此教材因文件较大被拆分为多个分片。下载后需按顺序合并（cat file.pdf.1 file.pdf.2 > file.pdf）才能使用。
+      </div>
+    `;
+  }
+
+  html += `
+    <div class="download-area free">
+      <div class="icon">⬇️</div>
+      <div class="title">免费下载</div>
+      <div class="desc">点击下方按钮直接下载 PDF 文件</div>
+      <div style="margin-top:16px">
+        <a class="btn btn-primary" href="${book._url}" target="_blank" style="font-size:15px;padding:10px 24px">
+          ⬇ 下载 ${book.name}
+        </a>
+      </div>
+    </div>
+  `;
+
+  if(book.sharded){
+    html += `
+      <div style="font-size:12px;color:var(--c-text-2);text-align:center;margin-top:8px">
+        分片下载后需合并：<code>cat ${book.name}.pdf.* > ${book.name}.pdf</code>
+      </div>
+    `;
+  }
+
+  content.innerHTML = html;
+  modal.classList.add('show');
+}
+
+document.getElementById('modalClose').onclick = () => {
+  document.getElementById('modal').classList.remove('show');
+};
+document.getElementById('modal').onclick = (e) => {
+  if(e.target === document.getElementById('modal')) {
+    document.getElementById('modal').classList.remove('show');
+  }
+};
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape') document.getElementById('modal').classList.remove('show');
+});
+
+// ---------- init ----------
+loadCatalog();
+</script>
+</body>
+</html>
